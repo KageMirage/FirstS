@@ -1,0 +1,6 @@
+{
+  "name": "Adverts PRO - Доска объявлений",
+  "description": "Современная доска объявлений и маркетплейс услуг: недвижимость, вакансии, авто, товары и сервисы с интеграцией REST API, Redux Toolkit и авторизацией.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
