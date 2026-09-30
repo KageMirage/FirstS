@@ -1,25 +1,65 @@
 'use client';
 
-import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import {
+  useSearchParams as useNextSearchParams,
+  usePathname as useNextPathname,
+  useRouter,
+} from 'next/navigation';
 
 export interface SetSearchParamsOptions {
   replace?: boolean;
   pathname?: string;
 }
 
-// Event type for custom internal navigation
 const LOCATION_CHANGE_EVENT = 'applet_location_change';
 
-function getWindowLocation(): string {
+// Global memory cache of current location string
+let currentLocation =
+  typeof window !== 'undefined'
+    ? `${window.location.pathname}${window.location.search}${window.location.hash}`
+    : '/';
+
+const listeners = new Set<() => void>();
+
+export function notifyLocationChange() {
+  if (typeof window !== 'undefined') {
+    currentLocation = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  }
+  listeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {}
+  });
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('popstate', notifyLocationChange);
+  window.addEventListener('hashchange', notifyLocationChange);
+  window.addEventListener(LOCATION_CHANGE_EVENT, notifyLocationChange);
+}
+
+function subscribe(callback: () => void) {
+  listeners.add(callback);
+  return () => {
+    listeners.delete(callback);
+  };
+}
+
+function getClientSnapshot(): string {
   if (typeof window === 'undefined') return '/';
-  return `${window.location.pathname}${window.location.search}`;
+  const real = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (real !== currentLocation) {
+    currentLocation = real;
+  }
+  return currentLocation;
 }
 
 /**
- * Global synchronized router hook.
+ * Universal synchronized router hook.
  * Fully hydration-safe for Next.js App Router and iframe embeds.
- * Any call to setSearchParams or navigate will instantly re-render ALL components
- * using this hook with the exact new searchParams and pathname.
+ * Integrates Next.js server-side query state during SSR/refresh,
+ * and synchronizes with fast client-side navigation.
  */
 export function useSearchParams(): [
   URLSearchParams,
@@ -33,36 +73,47 @@ export function useSearchParams(): [
   string, // current pathname
   (toPath: string, search?: Record<string, string | number | boolean | null | undefined>) => void // navigate helper
 ] {
-  const [locationString, setLocationString] = useState<string>('/');
+  const nextSearchParams = useNextSearchParams();
+  const nextPathname = useNextPathname();
+  const router = useRouter();
 
-  useEffect(() => {
-    // Sync with actual client location after hydration
-    setLocationString(getWindowLocation());
+  // Snapshot for SSR and initial hydration matching Next.js App Router
+  const serverSnapshot = useMemo(() => {
+    const p = nextPathname || '/';
+    const q = nextSearchParams?.toString() || '';
+    return q ? `${p}?${q}` : p;
+  }, [nextPathname, nextSearchParams]);
 
-    const onLocationChange = () => {
-      setLocationString(getWindowLocation());
-    };
-
-    window.addEventListener('popstate', onLocationChange);
-    window.addEventListener('hashchange', onLocationChange);
-    window.addEventListener(LOCATION_CHANGE_EVENT, onLocationChange);
-
-    return () => {
-      window.removeEventListener('popstate', onLocationChange);
-      window.removeEventListener('hashchange', onLocationChange);
-      window.removeEventListener(LOCATION_CHANGE_EVENT, onLocationChange);
-    };
-  }, []);
+  const locationString = useSyncExternalStore(
+    subscribe,
+    getClientSnapshot,
+    () => serverSnapshot
+  );
 
   const { pathname, searchParams } = useMemo(() => {
-    const qIndex = locationString.indexOf('?');
-    const path = qIndex >= 0 ? locationString.slice(0, qIndex) || '/' : locationString || '/';
-    const qs = qIndex >= 0 ? locationString.slice(qIndex + 1) : '';
+    let rawPath = '/';
+    let rawQs = '';
+
+    if (locationString) {
+      const hashIndex = locationString.indexOf('#');
+      const cleanLoc = hashIndex >= 0 ? locationString.slice(0, hashIndex) : locationString;
+      const qIndex = cleanLoc.indexOf('?');
+      rawPath = qIndex >= 0 ? cleanLoc.slice(0, qIndex) || '/' : cleanLoc || '/';
+      rawQs = qIndex >= 0 ? cleanLoc.slice(qIndex + 1) : '';
+    }
+
+    const effectivePath =
+      rawPath && rawPath !== '/' ? rawPath : nextPathname || rawPath || '/';
+
+    // Prioritize the active client query string, fallback to Next.js query params if empty
+    const effectiveQs =
+      rawQs !== '' ? rawQs : nextSearchParams ? nextSearchParams.toString() : '';
+
     return {
-      pathname: path,
-      searchParams: new URLSearchParams(qs),
+      pathname: effectivePath,
+      searchParams: new URLSearchParams(effectiveQs),
     };
-  }, [locationString]);
+  }, [locationString, nextPathname, nextSearchParams]);
 
   const setSearchParams = useCallback(
     (
@@ -80,7 +131,7 @@ export function useSearchParams(): [
       if (typeof nextInit === 'function') {
         next = nextInit(current);
       } else if (nextInit instanceof URLSearchParams) {
-        next = nextInit;
+        next = new URLSearchParams(nextInit);
       } else {
         next = new URLSearchParams();
         Object.entries(nextInit).forEach(([key, val]) => {
@@ -91,22 +142,26 @@ export function useSearchParams(): [
       }
 
       const queryString = next.toString();
-      const targetPath = options?.pathname !== undefined 
-        ? options.pathname 
-        : window.location.pathname;
-        
+      const targetPath =
+        options?.pathname !== undefined ? options.pathname : window.location.pathname;
+
       const newUrl = queryString ? `${targetPath}?${queryString}` : targetPath;
 
       if (options?.replace) {
         window.history.replaceState(null, '', newUrl);
+        try {
+          router.replace(newUrl, { scroll: false });
+        } catch {}
       } else {
         window.history.pushState(null, '', newUrl);
+        try {
+          router.push(newUrl, { scroll: false });
+        } catch {}
       }
 
-      setLocationString(newUrl);
-      window.dispatchEvent(new Event(LOCATION_CHANGE_EVENT));
+      notifyLocationChange();
     },
-    []
+    [router]
   );
 
   const navigate = useCallback(
@@ -125,11 +180,15 @@ export function useSearchParams(): [
       const newUrl = qs ? `${toPath}?${qs}` : toPath;
 
       window.history.pushState(null, '', newUrl);
-      setLocationString(newUrl);
-      window.dispatchEvent(new Event(LOCATION_CHANGE_EVENT));
+      try {
+        router.push(newUrl, { scroll: false });
+      } catch {}
+      notifyLocationChange();
     },
-    []
+    [router]
   );
 
   return [searchParams, setSearchParams, pathname, navigate];
 }
+
+export default useSearchParams;

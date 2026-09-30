@@ -37,6 +37,23 @@ export interface UserProfile {
   email_confirmed?: boolean;
 }
 
+export interface AdComment {
+  id: number;
+  text: string;
+  added_date: string;
+  user?: {
+    id: number;
+    full_name?: string;
+    avatar?: string | null;
+    phone_number?: string;
+  } | null;
+  ad: number;
+  parent?: number | null;
+  likes_count: number;
+  dislikes_count: number;
+  replies?: AdComment[];
+}
+
 export interface AdItem {
   id: number;
   title: string;
@@ -61,6 +78,7 @@ export interface AdItem {
     full_name?: string;
     avatar?: string | null;
     phone_number?: string;
+    email?: string;
   } | null;
   region?: {
     id: number;
@@ -68,16 +86,27 @@ export interface AdItem {
   } | null;
   address?: string;
   phone_number?: string;
+  whatsapp_number?: string | null;
+  telegram_number?: string | null;
   color?: string;
   image?: string;
-  images?: string[];
+  images?: Array<string | { id: number; image: string; ad?: number }>;
   added_date?: string;
   updated_date?: string;
+  lifted_date?: string;
+  can_lift?: boolean;
+  can_lift_in_hours?: number;
   is_pinned?: boolean;
+  pin_color?: string;
+  pin_until?: string | null;
   is_paid?: boolean;
+  is_approved?: boolean;
+  expiration_date?: string | null;
   views?: number;
+  favorites?: number[];
   favorites_count?: number;
   is_favorite?: boolean;
+  comments?: AdComment[];
   subCategoryTitle?: string;
   formattedDate?: string;
 }
@@ -124,4 +153,18 @@ export interface CreateAdPayload {
   address?: string;
   region_id?: number;
   image_file?: File | null;
+}
+
+export interface AdvertisingBanner {
+  id: number;
+  title: string;
+  badge?: string;
+  description?: string;
+  image?: string;
+  link?: string;
+  type?: 'aiza-med' | 'real-estate' | 'custom';
+  address?: string;
+  phones?: string[];
+  metro?: string;
+  services?: string[];
 }

@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Phone } from 'lucide-react';
 import { useUI } from '../hooks/useUI';
+import { apiService } from '../api/endpoints';
+import { AdvertisingBanner } from '../types/api';
 
 interface SideBannersProps {
   count?: number;
@@ -10,6 +12,24 @@ interface SideBannersProps {
 
 export const SideBanners: React.FC<SideBannersProps> = ({ count = 4 }) => {
   const { openPartnerBanner } = useUI();
+  const [banners, setBanners] = useState<AdvertisingBanner[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    apiService.getAdvertising()
+      .then((data) => {
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setBanners(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[SideBanners] Advertising API fallback active:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <aside className="w-full lg:w-72 xl:w-80 shrink-0 space-y-4" id="side-banners-column">
@@ -22,18 +42,22 @@ export const SideBanners: React.FC<SideBannersProps> = ({ count = 4 }) => {
           className="relative rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 group cursor-pointer border border-gray-100 aspect-[4/3] sm:aspect-[16/10] lg:aspect-[4/3] bg-gray-100"
         >
           <img
-            src="https://images.unsplash.com/photo-1613977257363-707ba9348227?w=600&auto=format&fit=crop&q=80"
-            alt="VIP Коттедж"
+            src={banners[0]?.image || "https://images.unsplash.com/photo-1613977257363-707ba9348227?w=600&auto=format&fit=crop&q=80"}
+            alt={banners[0]?.title || "VIP Коттедж"}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col justify-end p-4 text-white">
             <span className="bg-[#1a73e8] text-white text-[10px] font-bold px-2 py-0.5 rounded-full w-fit mb-1 shadow-sm">
-              VIP Недвижимость
+              {banners[0]?.badge || "VIP Недвижимость"}
             </span>
             <h5 className="font-bold text-sm leading-tight text-white drop-shadow-sm">
-              Элитные коттеджи и дома посуточно
+              {banners[0]?.title || "Элитные коттеджи и дома посуточно"}
             </h5>
-            <p className="text-[11px] text-gray-200 mt-0.5">Бассейн, сауна, терраса • Москва</p>
+            <p className="text-[11px] text-gray-200 mt-0.5">
+              {banners[0]?.description || "Бассейн, сауна, терраса • Москва"}
+            </p>
           </div>
         </div>
       )}
@@ -51,9 +75,11 @@ export const SideBanners: React.FC<SideBannersProps> = ({ count = 4 }) => {
               +
             </div>
             <div>
-              <p className="text-[10px] tracking-wider uppercase font-semibold text-cyan-100">Медицинский центр</p>
+              <p className="text-[10px] tracking-wider uppercase font-semibold text-cyan-100">
+                {banners[1]?.badge || "Медицинский центр"}
+              </p>
               <h4 className="text-base font-black tracking-tight text-white uppercase drop-shadow">
-                АЙЗА - МЕД
+                {banners[1]?.title || "АЙЗА - МЕД"}
               </h4>
             </div>
           </div>
@@ -80,18 +106,18 @@ export const SideBanners: React.FC<SideBannersProps> = ({ count = 4 }) => {
           <div className="bg-black/20 backdrop-blur-sm rounded-xl p-2 text-[9px] text-cyan-100 space-y-0.5 my-2 border border-white/10">
             <p className="font-bold text-white">м. Бутырская 2-й выход 3 мин</p>
             <p>метро Фонвизинская 5 мин</p>
-            <p className="text-cyan-200">Адрес: Огородный проезд 25/20</p>
+            <p className="text-cyan-200">Адрес: {banners[1]?.address || "Огородный проезд 25/20"}</p>
           </div>
 
           {/* Contacts */}
           <div className="bg-emerald-500/90 text-white rounded-xl p-2 text-[10px] font-bold space-y-0.5">
             <p className="flex items-center gap-1.5">
               <Phone className="w-3 h-3 shrink-0" />
-              <span>+7 968 871 47 14</span>
+              <span>{banners[1]?.phones?.[0] || "+7 968 871 47 14"}</span>
             </p>
             <p className="flex items-center gap-1.5">
               <Phone className="w-3 h-3 shrink-0" />
-              <span>+7 958 643 98 26</span>
+              <span>{banners[1]?.phones?.[1] || "+7 958 643 98 26"}</span>
             </p>
           </div>
 
@@ -111,18 +137,22 @@ export const SideBanners: React.FC<SideBannersProps> = ({ count = 4 }) => {
           className="relative rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 group cursor-pointer border border-gray-100 aspect-[4/3] sm:aspect-[16/10] lg:aspect-[4/3] bg-gray-100"
         >
           <img
-            src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop&q=80"
-            alt="Аренда дома"
+            src={banners[2]?.image || "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop&q=80"}
+            alt={banners[2]?.title || "Аренда дома"}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col justify-end p-4 text-white">
             <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full w-fit mb-1 shadow-sm">
-              Проверено
+              {banners[2]?.badge || "Проверено"}
             </span>
             <h5 className="font-bold text-sm leading-tight text-white drop-shadow-sm">
-              Сдается дом посуточно
+              {banners[2]?.title || "Сдается дом посуточно"}
             </h5>
-            <p className="text-[11px] text-gray-200 mt-0.5">Квартиры и мейманкана от хозяина</p>
+            <p className="text-[11px] text-gray-200 mt-0.5">
+              {banners[2]?.description || "Квартиры и мейманкана от хозяина"}
+            </p>
           </div>
         </div>
       )}
@@ -140,13 +170,15 @@ export const SideBanners: React.FC<SideBannersProps> = ({ count = 4 }) => {
             </div>
             <div>
               <h4 className="text-sm font-black tracking-tight text-white uppercase">
-                АЙЗА - МЕД
+                {banners[3]?.title || "АЙЗА - МЕД"}
               </h4>
-              <p className="text-[9px] text-cyan-100">Медицинские консультации и анализы</p>
+              <p className="text-[9px] text-cyan-100">
+                {banners[3]?.description || "Медицинские консультации и анализы"}
+              </p>
             </div>
           </div>
           <div className="bg-emerald-500 text-white rounded-lg p-1.5 text-center text-[10px] font-bold">
-            Записаться на прием: +7 968 871 47 14
+            Записаться на прием: {banners[3]?.phones?.[0] || "+7 968 871 47 14"}
           </div>
         </div>
       )}

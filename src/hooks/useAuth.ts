@@ -7,7 +7,8 @@ import {
   verifyOTPThunk, 
   logout as logoutAction, 
   resetOtpState,
-  setUser
+  setUser,
+  hydrateAuth
 } from '../store/slices/authSlice';
 import { setAuthModalOpen, showToast } from '../store/slices/uiSlice';
 import { UserProfile } from '../types/api';
@@ -86,6 +87,15 @@ export const useAuth = () => {
     dispatch(resetOtpState());
   }, [dispatch]);
 
+  const loginWithProfileAndToken = useCallback((profile: UserProfile, token: string) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('adverts_token', token);
+      localStorage.setItem('adverts_user', JSON.stringify(profile));
+    }
+    dispatch(hydrateAuth({ user: profile, token }));
+    dispatch(setAuthModalOpen(false));
+  }, [dispatch]);
+
   return {
     user,
     token,
@@ -102,6 +112,7 @@ export const useAuth = () => {
     logout,
     updateProfile,
     setUserProfile: updateProfile,
+    loginWithProfileAndToken,
     resetOtp,
   };
 };

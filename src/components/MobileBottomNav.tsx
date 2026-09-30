@@ -10,7 +10,7 @@ import { useAds } from '../hooks/useAds';
 export const MobileBottomNav: React.FC = () => {
   const [searchParams, setSearchParams, pathname] = useSearchParams();
   const { isAuthenticated } = useAuth();
-  const { openAuth, openCategoryMenu } = useUI();
+  const { openAuth, openCategoryMenu, notify } = useUI();
   const { favoriteIds } = useAds();
 
   const isHome = 
@@ -49,12 +49,18 @@ export const MobileBottomNav: React.FC = () => {
   };
 
   const handleCreateAd = () => {
+    if (!isAuthenticated) {
+      notify('Войдите или зарегистрируйтесь, чтобы подать объявление', 'info');
+      openAuth();
+      return;
+    }
     setSearchParams({ view: 'create-ad' }, { pathname: '/create' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleGoFavorites = () => {
     if (!isAuthenticated) {
+      notify('Войдите в аккаунт, чтобы просмотреть избранное', 'info');
       openAuth();
     } else {
       setSearchParams({ view: 'profile', tab: 'favorites' }, { pathname: '/cabinet' });
@@ -101,16 +107,18 @@ export const MobileBottomNav: React.FC = () => {
           <Search className="w-5 h-5 stroke-[2.2]" />
         </button>
 
-        {/* 3. Center Create Ad Floating Button */}
-        <button
-          type="button"
-          id="btn-mobile-nav-create"
-          onClick={handleCreateAd}
-          className="w-11 h-11 rounded-full bg-[#1976D2] hover:bg-[#1565C0] text-white flex items-center justify-center shadow-lg shadow-blue-500/30 -mt-6 active:scale-95 transition-all cursor-pointer ring-4 ring-white"
-          aria-label="Подать объявление"
-        >
-          <Plus className="w-6 h-6 stroke-[2.5]" />
-        </button>
+        {/* 3. Center Create Ad Floating Button (Только если авторизован) */}
+        {isAuthenticated && (
+          <button
+            type="button"
+            id="btn-mobile-nav-create"
+            onClick={handleCreateAd}
+            className="w-11 h-11 rounded-full bg-[#1976D2] hover:bg-[#1565C0] text-white flex items-center justify-center shadow-lg shadow-blue-500/30 -mt-6 active:scale-95 transition-all cursor-pointer ring-4 ring-white"
+            aria-label="Подать объявление"
+          >
+            <Plus className="w-6 h-6 stroke-[2.5]" />
+          </button>
+        )}
 
         {/* 4. Favorites Button */}
         <button

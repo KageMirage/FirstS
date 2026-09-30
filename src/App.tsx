@@ -1,32 +1,36 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense } from 'react';
 import { Navbar } from './components/Navbar';
 import { HomePage } from './components/HomePage';
-import { FilterPage } from './components/FilterPage';
-import { AdDetailPage } from './components/AdDetailPage';
-import { CreateAdPage } from './components/CreateAdPage';
-import { CabinetPage } from './components/CabinetPage';
-import { SellerProfilePage } from './components/SellerProfilePage';
 import { Footer } from './components/Footer';
-import { PostAdModal } from './components/PostAdModal';
-import { AdDetailModal } from './components/AdDetailModal';
-import { AuthModal } from './components/AuthModal';
-import { CategoryDropdownModal } from './components/CategoryDropdownModal';
-import { PartnerBannerModal } from './components/PartnerBannerModal';
 import { ToastNotification } from './components/ToastNotification';
 import { MobileBottomNav } from './components/MobileBottomNav';
-import { useAds } from './hooks/useAds';
 import { useSearchParams } from './hooks/useSearchParams';
 
-export function App() {
-  const { loadAds } = useAds();
-  const [searchParams, , pathname] = useSearchParams();
+// Lazy load secondary routes & heavy modals to minimize initial bundle size and avoid data overload
+const FilterPage = React.lazy(() => import('./components/FilterPage').then((m) => ({ default: m.FilterPage })));
+const AdDetailPage = React.lazy(() => import('./components/AdDetailPage').then((m) => ({ default: m.AdDetailPage })));
+const CreateAdPage = React.lazy(() => import('./components/CreateAdPage').then((m) => ({ default: m.CreateAdPage })));
+const CabinetPage = React.lazy(() => import('./components/CabinetPage').then((m) => ({ default: m.CabinetPage })));
+const SellerProfilePage = React.lazy(() => import('./components/SellerProfilePage').then((m) => ({ default: m.SellerProfilePage })));
+const PostAdModal = React.lazy(() => import('./components/PostAdModal').then((m) => ({ default: m.PostAdModal })));
+const AdDetailModal = React.lazy(() => import('./components/AdDetailModal').then((m) => ({ default: m.AdDetailModal })));
+const AuthModal = React.lazy(() => import('./components/AuthModal').then((m) => ({ default: m.AuthModal })));
+const CategoryDropdownModal = React.lazy(() => import('./components/CategoryDropdownModal').then((m) => ({ default: m.CategoryDropdownModal })));
+const PartnerBannerModal = React.lazy(() => import('./components/PartnerBannerModal').then((m) => ({ default: m.PartnerBannerModal })));
 
-  useEffect(() => {
-    // Initial fetch from the REST API
-    loadAds();
-  }, [loadAds]);
+function PageLoadingFallback() {
+  return (
+    <div className="min-h-[450px] flex flex-col items-center justify-center py-24 space-y-3">
+      <div className="w-9 h-9 rounded-full border-3 border-gray-200 border-t-[#1976D2] animate-spin" />
+      <span className="text-xs text-gray-400 font-medium">Загрузка страницы...</span>
+    </div>
+  );
+}
+
+export function App() {
+  const [searchParams, , pathname] = useSearchParams();
 
   const isCabinetPage =
     pathname === '/profile' ||
@@ -83,19 +87,21 @@ export function App() {
 
       {/* Main Content: Cabinet, Seller Profile, Create Ad, Ad Detail, Filter, or Home Page */}
       <main className="flex-1">
-        {isCabinetPage ? (
-          <CabinetPage />
-        ) : isSellerPage ? (
-          <SellerProfilePage />
-        ) : isCreateAdPage ? (
-          <CreateAdPage />
-        ) : isAdDetailPage ? (
-          <AdDetailPage />
-        ) : isFilterPage ? (
-          <FilterPage />
-        ) : (
-          <HomePage />
-        )}
+        <Suspense fallback={<PageLoadingFallback />}>
+          {isCabinetPage ? (
+            <CabinetPage />
+          ) : isSellerPage ? (
+            <SellerProfilePage />
+          ) : isCreateAdPage ? (
+            <CreateAdPage />
+          ) : isAdDetailPage ? (
+            <AdDetailPage />
+          ) : isFilterPage ? (
+            <FilterPage />
+          ) : (
+            <HomePage />
+          )}
+        </Suspense>
       </main>
 
       {/* Dark Footer with App download and links */}
@@ -104,12 +110,15 @@ export function App() {
       {/* Mobile Floating Bottom Navigation Bar (Screenshots 2, 3, 4) */}
       <MobileBottomNav />
 
-      {/* Modals & Overlays */}
-      <PostAdModal />
-      <AdDetailModal />
-      <AuthModal />
-      <CategoryDropdownModal />
-      <PartnerBannerModal />
+      {/* Modals & Overlays (Loaded lazily on-demand) */}
+      <Suspense fallback={null}>
+        <PostAdModal />
+        <AdDetailModal />
+        <AuthModal />
+        <CategoryDropdownModal />
+        <PartnerBannerModal />
+      </Suspense>
+
       <ToastNotification />
 
     </div>

@@ -30,6 +30,9 @@ interface CategoriesState {
   activePillId: string;
   selectedCategory: Category | null;
   isLoading: boolean;
+  isCategoriesLoaded: boolean;
+  isChildLoading: boolean;
+  isChildCategoriesLoaded: boolean;
   error: string | null;
 }
 
@@ -45,6 +48,9 @@ const initialState: CategoriesState = {
   activePillId: 'popular',
   selectedCategory: null,
   isLoading: false,
+  isCategoriesLoaded: false,
+  isChildLoading: false,
+  isChildCategoriesLoaded: false,
   error: null,
 };
 
@@ -57,6 +63,16 @@ export const fetchCategories = createAsyncThunk(
     } catch (err: any) {
       return rejectWithValue(err.message || 'Ошибка загрузки категорий');
     }
+  },
+  {
+    condition: (_, { getState }) => {
+      const state = (getState() as any).categories as CategoriesState;
+      // Skip if already loading or already successfully loaded
+      if (state.isLoading || state.isCategoriesLoaded) {
+        return false;
+      }
+      return true;
+    },
   }
 );
 
@@ -69,6 +85,16 @@ export const fetchChildCategories = createAsyncThunk(
     } catch (err: any) {
       return rejectWithValue(err.message || 'Ошибка загрузки подкатегорий');
     }
+  },
+  {
+    condition: (_, { getState }) => {
+      const state = (getState() as any).categories as CategoriesState;
+      // Skip if already loading or already successfully loaded
+      if (state.isChildLoading || state.isChildCategoriesLoaded) {
+        return false;
+      }
+      return true;
+    },
   }
 );
 
@@ -91,6 +117,7 @@ export const categoriesSlice = createSlice({
       })
       .addCase(fetchCategories.fulfilled, (state, action) => {
         state.isLoading = false;
+        state.isCategoriesLoaded = true;
         state.categories = action.payload;
         
         // Dynamically build featured category cards with exact backend names, images, and real num_of_ads
@@ -123,8 +150,16 @@ export const categoriesSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
+      .addCase(fetchChildCategories.pending, (state) => {
+        state.isChildLoading = true;
+      })
       .addCase(fetchChildCategories.fulfilled, (state, action) => {
+        state.isChildLoading = false;
+        state.isChildCategoriesLoaded = true;
         state.childCategories = action.payload;
+      })
+      .addCase(fetchChildCategories.rejected, (state) => {
+        state.isChildLoading = false;
       });
   },
 });

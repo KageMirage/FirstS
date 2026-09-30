@@ -18,6 +18,9 @@ export const useCategories = () => {
     activePillId, 
     selectedCategory, 
     isLoading, 
+    isCategoriesLoaded,
+    isChildLoading,
+    isChildCategoriesLoaded,
     error 
   } = useAppSelector((state) => state.categories);
 
@@ -30,13 +33,13 @@ export const useCategories = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    if (categories.length === 0 && !isLoading) {
+    if (!isCategoriesLoaded && !isLoading) {
       dispatch(fetchCategories());
     }
-    if (childCategories.length === 0) {
+    if (!isChildCategoriesLoaded && !isChildLoading) {
       dispatch(fetchChildCategories());
     }
-  }, [dispatch, categories.length, childCategories.length, isLoading]);
+  }, [dispatch, isCategoriesLoaded, isChildCategoriesLoaded, isLoading, isChildLoading]);
 
   return {
     categories,

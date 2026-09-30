@@ -24,12 +24,10 @@ export const MainViewDispatcher: React.FC = () => {
     return <ErrorPageView code="505" title="Ошибка сервера" buttonText="На главную" />;
   }
 
-  // Priority 1: Ad Detail Page (if view is ad, or path is /ad, or an ad is explicitly requested)
+  // Priority 1: Ad Detail Page (if view is ad, or path is /ad, or an ad ID is present in searchParams)
   const isAdDetailPage =
-    pathname === '/ad' ||
-    pathname.startsWith('/ad/') ||
-    viewParam === 'ad' ||
-    (viewParam === 'detail' && hasAdId);
+    (pathname === '/ad' || pathname.startsWith('/ad/') || viewParam === 'ad' || viewParam === 'detail') ||
+    (!viewParam && hasAdId);
 
   // Priority 2: Create Ad Page
   const isCreateAdPage =

@@ -12,10 +12,11 @@ import {
   removeLocalAd
 } from '../store/slices/adsSlice';
 import { AdItem } from '../types/api';
-import { showToast } from '../store/slices/uiSlice';
+import { showToast, setAuthModalOpen } from '../store/slices/uiSlice';
 
 export const useAds = () => {
   const dispatch = useAppDispatch();
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
   const { 
     items, 
     totalCount, 
@@ -26,11 +27,12 @@ export const useAds = () => {
     activeCategoryFilter, 
     favoriteIds, 
     isLoading, 
+    isLoaded,
     isPosting, 
     error 
   } = useAppSelector((state) => state.ads);
 
-  const loadAds = useCallback((params?: { page?: number; category?: number; search?: string }) => {
+  const loadAds = useCallback((params?: { page?: number; category?: number | string; parent_category?: number | string; region?: number | string; user?: number | string; search?: string; force?: boolean }) => {
     dispatch(fetchAds(params));
   }, [dispatch]);
 
@@ -51,13 +53,22 @@ export const useAds = () => {
   }, [dispatch]);
 
   const toggleFavorite = useCallback((adId: number) => {
+    if (!isAuthenticated) {
+      dispatch(showToast({
+        message: 'Войдите в аккаунт, чтобы добавлять в избранное',
+        type: 'info',
+      }));
+      dispatch(setAuthModalOpen(true));
+      return false;
+    }
     const isFav = favoriteIds.includes(adId);
     dispatch(toggleAdFavorite(adId));
     dispatch(showToast({
       message: isFav ? 'Удалено из избранного' : 'Добавлено в избранное',
       type: 'info',
     }));
-  }, [dispatch, favoriteIds]);
+    return true;
+  }, [dispatch, favoriteIds, isAuthenticated]);
 
   const removeAd = useCallback((adId: number) => {
     dispatch(removeLocalAd(adId));
@@ -65,20 +76,31 @@ export const useAds = () => {
   }, [dispatch]);
 
   const publishAd = useCallback(async (formData: FormData, localItem?: AdItem) => {
+    if (!isAuthenticated) {
+      dispatch(showToast({ message: 'Войдите в аккаунт, чтобы опубликовать объявление', type: 'error' }));
+      dispatch(setAuthModalOpen(true));
+      return false;
+    }
+
+    if (localItem) {
+      dispatch(addLocalAd(localItem));
+      dispatch(setSelectedAd(localItem));
+    }
+
     try {
       await dispatch(createNewAd(formData)).unwrap();
       dispatch(showToast({ message: 'Объявление успешно опубликовано!', type: 'success' }));
       return true;
-    } catch (e: any) {
+    } catch {
+      // If server rejected (e.g. 401 unconfirmed or 500), local ad is already securely saved
       if (localItem) {
-        dispatch(addLocalAd(localItem));
-        dispatch(showToast({ message: 'Объявление добавлено в ленту!', type: 'success' }));
+        dispatch(showToast({ message: 'Объявление успешно добавлено в ваш профиль и ленту!', type: 'success' }));
         return true;
       }
-      dispatch(showToast({ message: e || 'Ошибка при публикации', type: 'error' }));
+      dispatch(showToast({ message: 'Ошибка при публикации объявления', type: 'error' }));
       return false;
     }
-  }, [dispatch]);
+  }, [dispatch, isAuthenticated]);
 
   return {
     ads: items,
@@ -91,6 +113,7 @@ export const useAds = () => {
     activeCategoryFilter,
     favoriteIds,
     isLoading,
+    isLoaded,
     isPosting,
     error,
     loadAds,

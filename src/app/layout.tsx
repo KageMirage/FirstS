@@ -34,20 +34,22 @@ export default function RootLayout({
     <html lang="ru">
       <body className="min-h-screen bg-[#fcfdfe] text-gray-900 font-sans antialiased selection:bg-[#1976D2] selection:text-white pb-20 sm:pb-0" id="adverts-pro-app">
         <Providers>
-          <div className="min-h-screen flex flex-col">
-            <Navbar />
-            <main className="flex-1">
-              {children}
-            </main>
-            <Footer />
-            <MobileBottomNav />
-            <PostAdModal />
-            <AdDetailModal />
-            <AuthModal />
-            <CategoryDropdownModal />
-            <PartnerBannerModal />
-            <ToastNotification />
-          </div>
+          <React.Suspense fallback={null}>
+            <div className="min-h-screen flex flex-col">
+              <Navbar />
+              <main className="flex-1">
+                {children}
+              </main>
+              <Footer />
+              <MobileBottomNav />
+              <PostAdModal />
+              <AdDetailModal />
+              <AuthModal />
+              <CategoryDropdownModal />
+              <PartnerBannerModal />
+              <ToastNotification />
+            </div>
+          </React.Suspense>
         </Providers>
       </body>
     </html>

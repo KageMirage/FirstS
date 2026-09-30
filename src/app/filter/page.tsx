@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { MainViewDispatcher } from '../../components/MainViewDispatcher';
+import { FilterPage } from '../../components/FilterPage';
 
 export default function Page() {
-  return <MainViewDispatcher />;
+  return <FilterPage />;
 }

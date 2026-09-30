@@ -12,6 +12,7 @@ interface AdsState {
   activeCategoryFilter: number | null;
   favoriteIds: number[];
   isLoading: boolean;
+  isLoaded: boolean;
   isPosting: boolean;
   error: string | null;
 }
@@ -26,6 +27,7 @@ const initialState: AdsState = {
   activeCategoryFilter: null,
   favoriteIds: [],
   isLoading: false,
+  isLoaded: false,
   isPosting: false,
   error: null,
 };
@@ -33,7 +35,7 @@ const initialState: AdsState = {
 export const fetchAds = createAsyncThunk(
   'ads/fetchAds',
   async (
-    params: { page?: number; category?: number | string; parent_category?: number | string; search?: string } | undefined,
+    params: { page?: number; category?: number | string; parent_category?: number | string; search?: string; region?: number | string; user?: number | string; force?: boolean } | undefined,
     { rejectWithValue }
   ) => {
     try {
@@ -47,6 +49,19 @@ export const fetchAds = createAsyncThunk(
         'Ошибка загрузки объявлений';
       return rejectWithValue(errorMsg);
     }
+  },
+  {
+    condition: (params, { getState }) => {
+      const state = (getState() as any).ads as AdsState;
+      if (state.isLoading) {
+        return false; // Skip if already loading
+      }
+      // If already loaded and default list is requested without force, skip
+      if (!params?.force && (!params || Object.keys(params).length === 0) && state.isLoaded) {
+        return false;
+      }
+      return true;
+    },
   }
 );
 
@@ -92,6 +107,16 @@ export const adsSlice = createSlice({
     },
     setSelectedAd: (state, action: PayloadAction<AdItem | null>) => {
       state.selectedAd = action.payload;
+      if (typeof window !== 'undefined') {
+        try {
+          if (action.payload) {
+            sessionStorage.setItem('adverts_selected_ad', JSON.stringify(action.payload));
+            localStorage.setItem('adverts_last_selected_ad', JSON.stringify(action.payload));
+          } else {
+            sessionStorage.removeItem('adverts_selected_ad');
+          }
+        } catch {}
+      }
     },
     setCategoryFilter: (state, action: PayloadAction<number | null>) => {
       state.activeCategoryFilter = action.payload;
@@ -112,12 +137,30 @@ export const adsSlice = createSlice({
       state.favoriteIds = action.payload;
     },
     addLocalAd: (state, action: PayloadAction<AdItem>) => {
-      state.items.unshift(action.payload);
-      state.totalCount += 1;
+      // Prevent duplicates
+      state.items = [action.payload, ...state.items.filter((item) => item.id !== action.payload.id)];
+      state.totalCount = state.items.length;
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('adverts_local_ads');
+          const saved: AdItem[] = raw ? JSON.parse(raw) : [];
+          const updated = [action.payload, ...saved.filter((item) => item.id !== action.payload.id)].slice(0, 50);
+          localStorage.setItem('adverts_local_ads', JSON.stringify(updated));
+        } catch {}
+      }
     },
     removeLocalAd: (state, action: PayloadAction<number>) => {
       state.items = state.items.filter((ad) => ad.id !== action.payload);
       state.totalCount = Math.max(0, state.totalCount - 1);
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('adverts_local_ads');
+          if (raw) {
+            const saved: AdItem[] = JSON.parse(raw);
+            localStorage.setItem('adverts_local_ads', JSON.stringify(saved.filter((item) => item.id !== action.payload)));
+          }
+        } catch {}
+      }
     },
   },
   extraReducers: (builder) => {
@@ -128,6 +171,7 @@ export const adsSlice = createSlice({
       })
       .addCase(fetchAds.fulfilled, (state, action) => {
         state.isLoading = false;
+        state.isLoaded = true;
         state.error = null;
 
         // Extract array from results or payload directly
@@ -138,10 +182,25 @@ export const adsSlice = createSlice({
         const apiAds: AdItem[] = rawResults.map((item: any) => ({
           ...item,
           subCategoryTitle: item.category?.name || item.parent_category?.name || 'Объявление',
-          formattedDate: item.added_date ? `Дата: ${item.added_date}` : `${item.price || 0} Руб`,
+          formattedDate: item.added_date ? `Дата: ${item.added_date}` : `${item.price || 0} сом`,
         }));
 
-        state.items = apiAds;
+        let localAds: AdItem[] = [];
+        if (typeof window !== 'undefined') {
+          try {
+            const raw = localStorage.getItem('adverts_local_ads');
+            if (raw) localAds = JSON.parse(raw);
+          } catch {}
+        }
+
+        const combined = [...localAds];
+        apiAds.forEach((ad) => {
+          if (!combined.some((item) => item.id === ad.id)) {
+            combined.push(ad);
+          }
+        });
+
+        state.items = combined;
         state.totalCount =
           typeof action.payload?.count === 'number'
             ? action.payload.count
@@ -154,9 +213,18 @@ export const adsSlice = createSlice({
       })
       .addCase(fetchAds.rejected, (state, action) => {
         state.isLoading = false;
-        state.items = [];
-        state.totalCount = 0;
-        state.totalPages = 1;
+        let localAds: AdItem[] = [];
+        if (typeof window !== 'undefined') {
+          try {
+            const raw = localStorage.getItem('adverts_local_ads');
+            if (raw) localAds = JSON.parse(raw);
+          } catch {}
+        }
+        if (state.items.length === 0 && localAds.length > 0) {
+          state.items = localAds;
+          state.totalCount = localAds.length;
+          state.totalPages = Math.max(1, Math.ceil(localAds.length / 20));
+        }
         state.error = (action.payload as string) || 'Не удалось загрузить объявления с сервера';
       })
       .addCase(createNewAd.pending, (state) => {
@@ -164,8 +232,15 @@ export const adsSlice = createSlice({
       })
       .addCase(createNewAd.fulfilled, (state, action) => {
         state.isPosting = false;
-        state.items.unshift(action.payload);
-        state.totalCount += 1;
+        if (action.payload && action.payload.id) {
+          const idx = state.items.findIndex((item) => item.id === action.payload.id);
+          if (idx >= 0) {
+            state.items[idx] = action.payload;
+          } else {
+            state.items.unshift(action.payload);
+            state.totalCount += 1;
+          }
+        }
       })
       .addCase(createNewAd.rejected, (state) => {
         state.isPosting = false;
@@ -179,6 +254,12 @@ export const adsSlice = createSlice({
         }
         try {
           localStorage.setItem('adverts_favorites', JSON.stringify(state.favoriteIds));
+        } catch {}
+      })
+      .addCase('auth/logout', (state) => {
+        state.favoriteIds = [];
+        try {
+          localStorage.removeItem('adverts_favorites');
         } catch {}
       });
   },
